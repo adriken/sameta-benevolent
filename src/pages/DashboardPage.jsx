@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
@@ -8,6 +8,7 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const [posts, setPosts] = useState([]);
   const [loadingPosts, setLoadingPosts] = useState(true);
+  const [postsError, setPostsError] = useState("");
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -16,6 +17,7 @@ export default function DashboardPage() {
 
   const loadPosts = async () => {
     setLoadingPosts(true);
+    setPostsError("");
 
     const { data, error } = await supabase
       .from("posts")
@@ -23,12 +25,14 @@ export default function DashboardPage() {
       .order("created_at", { ascending: false });
 
     if (error) {
-      console.error(error.message);
+      console.error("POSTS ERROR:", error);
+      setPostsError(error.message || "Failed to load posts.");
       setLoadingPosts(false);
       return;
     }
 
     setPosts(data || []);
+    console.log("ALL POSTS:", data);
     setLoadingPosts(false);
   };
 
@@ -36,14 +40,21 @@ export default function DashboardPage() {
     loadPosts();
   }, []);
 
-  const groupedPosts = useMemo(() => {
-    return {
-      announcements: posts.filter((post) => post.type === "announcement"),
-      meetings: posts.filter((post) => post.type === "meeting"),
-      visits: posts.filter((post) => post.type === "visit"),
-      events: posts.filter((post) => post.type === "event"),
-    };
-  }, [posts]);
+  const announcements = posts.filter(
+    (p) => p.type?.toLowerCase() === "announcement"
+  );
+
+  const events = posts.filter(
+    (p) => p.type?.toLowerCase() === "event"
+  );
+
+  const meetings = posts.filter(
+    (p) => p.type?.toLowerCase() === "meeting"
+  );
+
+  const visits = posts.filter(
+    (p) => p.type?.toLowerCase() === "visit"
+  );
 
   const renderSection = (title, items) => (
     <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-6 transition duration-300 hover:-translate-y-1 hover:shadow-sm">
@@ -53,10 +64,10 @@ export default function DashboardPage() {
 
       {loadingPosts ? (
         <div className="mt-4 space-y-3">
-  <div className="h-4 w-32 animate-pulse rounded bg-slate-200" />
-  <div className="h-4 w-full animate-pulse rounded bg-slate-200" />
-  <div className="h-4 w-5/6 animate-pulse rounded bg-slate-200" />
-</div>
+          <div className="h-4 w-32 animate-pulse rounded bg-slate-200" />
+          <div className="h-4 w-full animate-pulse rounded bg-slate-200" />
+          <div className="h-4 w-5/6 animate-pulse rounded bg-slate-200" />
+        </div>
       ) : items.length === 0 ? (
         <div className="mt-4 text-sm text-slate-500">No updates yet.</div>
       ) : (
@@ -94,9 +105,12 @@ export default function DashboardPage() {
               <h1 className="mt-3 text-3xl font-semibold tracking-tight md:text-5xl">
                 Welcome back
               </h1>
+              <p className="mt-4 text-lg leading-8 text-slate-600">
+                Logged in as: {user?.email}
+              </p>
               <div className="mt-4 inline-flex rounded-full border border-orange-200 bg-orange-50 px-4 py-2 text-sm text-orange-700">
-  Member-only community updates, meetings, visits, and events.
-</div>
+                Member-only community updates, meetings, visits, and events.
+              </div>
             </div>
 
             <div className="flex flex-wrap gap-3">
@@ -125,11 +139,17 @@ export default function DashboardPage() {
             </div>
           </div>
 
+          {postsError && (
+            <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {postsError}
+            </div>
+          )}
+
           <div className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-2">
-            {renderSection("Announcements", groupedPosts.announcements)}
-            {renderSection("Meetings", groupedPosts.meetings)}
-            {renderSection("Visits", groupedPosts.visits)}
-            {renderSection("Events", groupedPosts.events)}
+            {renderSection("Announcements", announcements)}
+            {renderSection("Meetings", meetings)}
+            {renderSection("Visits", visits)}
+            {renderSection("Events", events)}
           </div>
         </div>
       </div>
