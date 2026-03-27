@@ -20,6 +20,9 @@ export default function AdminPage() {
   const [postForm, setPostForm] = useState(initialPost);
   const [postLoading, setPostLoading] = useState(false);
 
+  const [allPosts, setAllPosts] = useState([]);
+  const [loadingAllPosts, setLoadingAllPosts] = useState(true);
+
   const loadApplications = async () => {
     setLoading(true);
     setError("");
@@ -39,8 +42,27 @@ export default function AdminPage() {
     setLoading(false);
   };
 
+  const loadAllPosts = async () => {
+    setLoadingAllPosts(true);
+
+    const { data, error } = await supabase
+      .from("posts")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      setError(error.message);
+      setLoadingAllPosts(false);
+      return;
+    }
+
+    setAllPosts(data || []);
+    setLoadingAllPosts(false);
+  };
+
   useEffect(() => {
     loadApplications();
+    loadAllPosts();
   }, []);
 
   const approveApplication = async (applicationId) => {
@@ -73,7 +95,10 @@ export default function AdminPage() {
         return;
       }
 
-      setMessage(data?.message || "Application approved.");
+      setMessage(
+        data?.message ||
+          "Application approved. An invitation email has been sent to the member."
+      );
       setActionLoading("");
       loadApplications();
     } catch (err) {
@@ -113,7 +138,7 @@ export default function AdminPage() {
       {
         title: postForm.title,
         body: postForm.body,
-        type: postForm.type,
+        type: postForm.type.toLowerCase(),
         posted_by: user?.id,
       },
     ]);
@@ -127,6 +152,28 @@ export default function AdminPage() {
     setMessage("Post created successfully.");
     setPostForm(initialPost);
     setPostLoading(false);
+    loadAllPosts();
+  };
+
+  const handleDeletePost = async (postId) => {
+    const confirmed = window.confirm("Are you sure you want to delete this post?");
+    if (!confirmed) return;
+
+    setError("");
+    setMessage("");
+
+    const { error } = await supabase
+      .from("posts")
+      .delete()
+      .eq("id", postId);
+
+    if (error) {
+      setError(error.message);
+      return;
+    }
+
+    setMessage("Post deleted successfully.");
+    loadAllPosts();
   };
 
   return (
@@ -179,11 +226,17 @@ export default function AdminPage() {
                       <div className="flex flex-wrap items-start justify-between gap-4">
                         <div>
                           <div className="text-lg font-semibold">
-                            {[app.first_name, app.last_name].filter(Boolean).join(" ") || "Unnamed Applicant"}
+                            {[app.first_name, app.last_name].filter(Boolean).join(" ") ||
+                              "Unnamed Applicant"}
                           </div>
-                          <div className="mt-1 text-sm text-slate-500">{app.email}</div>
+                          <div className="mt-1 text-sm text-slate-500">
+                            {app.email}
+                          </div>
                           <div className="mt-2 text-sm text-slate-500">
-                            Status: <span className="font-medium text-slate-700">{app.status}</span>
+                            Status:{" "}
+                            <span className="font-medium text-slate-700">
+                              {app.status}
+                            </span>
                           </div>
                         </div>
 
@@ -280,6 +333,53 @@ export default function AdminPage() {
                 </button>
               </form>
             </div>
+          </div>
+
+          <div className="mt-10">
+            <div className="mb-4 text-xl font-semibold">Manage Posts</div>
+
+            {loadingAllPosts ? (
+              <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-6">
+                Loading posts...
+              </div>
+            ) : allPosts.length === 0 ? (
+              <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-6">
+                No posts created yet.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {allPosts.map((post) => (
+                  <div
+                    key={post.id}
+                    className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-6"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div>
+                        <div className="text-sm uppercase tracking-[0.18em] text-orange-600">
+                          {post.type}
+                        </div>
+                        <div className="mt-2 text-lg font-semibold text-slate-900">
+                          {post.title}
+                        </div>
+                        <div className="mt-2 text-sm leading-6 text-slate-600">
+                          {post.body}
+                        </div>
+                        <div className="mt-3 text-xs text-slate-400">
+                          {new Date(post.created_at).toLocaleString()}
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => handleDeletePost(post.id)}
+                        className="rounded-2xl border border-red-200 bg-red-50 px-5 py-3 font-medium text-red-700 transition hover:bg-red-100"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="mt-8">
